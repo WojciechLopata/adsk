@@ -1,0 +1,12 @@
+[Unit]
+Description=Docker Container: my_ecommerce
+Requires=docker.service
+After=docker.service
+
+[Service]
+Restart=always
+ExecStart=/usr/bin/docker start -a my_ecommerce
+ExecStop=/usr/bin/docker stop my_ecommerce
+
+[Install]
+WantedBy=multi-user.target

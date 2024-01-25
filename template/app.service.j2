@@ -1,0 +1,12 @@
+[Unit]
+Description=My ecommerce 
+After=network-online.target
+
+[Service]
+Type=simple
+User=ec2-user
+ExecStart=java -Dserver.port=8080 -jar /opt/ecommerce/app.jar
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

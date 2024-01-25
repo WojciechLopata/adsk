@@ -1,0 +1,114 @@
+---
+- name: "Install and setup Docker containers"
+
+  hosts: app_nodes
+  become: yes
+  vars:
+    influxdb_ip: "{{ ansible_host }}"
+  tasks:
+   
+    - name: "Show var"
+      debug:
+        msg: "{{ influxdb_ip }}"
+    - name: "Install Docker"
+      dnf:
+        name: docker
+        state: latest
+    
+    - name: "Setup systemctl"
+      shell: "systemctl start docker"
+
+    - name: "Remove all Docker containers"
+      block:
+        - name: "Stop all Docker containers"
+          shell: "docker stop $(docker ps -aq)"
+          ignore_errors: yes  # Ignore errors in case no containers are running
+
+        - name: "Remove all Docker containers"
+          shell: "docker rm $(docker ps -aq)"
+          ignore_errors: yes  # Ignore errors in case no containers exist
+    - name: "prepare directories"
+      shell: "mkdir /opt/ecommerce/"
+      ignore_errors: yes
+    - name: "copy dockerfile"
+      copy: 
+        src: "dockerfile"
+        dest: "/opt/ecommerce/Dockerfile"
+    - name: "Build ecommerce"
+      shell: "sudo docker build -t my_ecommerce /opt/ecommerce/"
+
+    - name: "Run ecommerce app"
+      shell: "sudo docker run --name my_ecommerce -d -p 80:8080 my_ecommerce"
+
+    - name: "Install Grafana in Docker"
+      shell: "sudo docker run -d --name=grafana -p 3000:3000 grafana/grafana"
+
+    - name: "Install InfluxDB in Docker"
+      shell: "sudo docker run -d --name=influxdb -p 8086:8086 influxdb:1.8-alpine"
+    
+    - name: "Copy Grafana datasource template into instance"
+      template:
+        src: "template/grafana_datasource_config.yaml.j2"
+        dest: "/tmp/grafana_datasource_config.yaml"
+      become: yes
+
+
+    - name: "Copy datasource from instance  to Grafana container"
+      command: >
+        docker cp /tmp/grafana_datasource_config.yaml
+        grafana:/etc/grafana/provisioning/datasources/datasource.yaml
+      become: yes
+    - name: "Notify Grafana Restart"
+      meta: flush_handlers
+      
+    - name: "Copy Grafana dashboard  into instance"
+      template:
+        src: "template/First_dashboard.json"
+        dest: "/tmp/First_dashboard.json"
+      become: yes
+    - name: "Restart grafana container"
+      shell: "sudo docker restart grafana"
+
+
+    - name: "Copy dashboard from instance  to Grafana container"
+      command: >
+        docker cp /tmp/First_dashboard.json
+        grafana:/etc/grafana/provisioning/dashboards/First_dashboard.json
+      become: yes
+
+    - name: "Notify Grafana Restart"
+      meta: flush_handlers
+
+    - name: "Create systemd service for my_ecommerce Docker container"
+      copy:
+        src: "template/my_eccomerce.service.j2"
+        dest: "/etc/systemd/system/.service"
+   
+
+    - name: "Create systemd service for grafana Docker container"
+      template:
+        src: "template/grafana.service.j2"
+        dest: "/etc/systemd/system/grafana.service"
+
+    - name: "Create systemd service for influxdb Docker container"
+      template:
+        src: "template/influxdb.service.j2"
+        dest: "/etc/systemd/system/influxdb.service"
+     
+
+    - name: "Install Telegraf"
+      shell: "sudo dnf install https://dl.influxdata.com/telegraf/releases/telegraf-1.29.1-1.x86_64.rpm -y"
+
+    - name: "Create Telegraf config"
+      template:
+        src: "template/telegraf.service.conf"
+        dest: "/etc/telegraf/config.conf"
+    - name: "Apply Telegraf config"
+      shell: "telegraf --config /etc/telegraf/config.conf"
+      async: 0
+      poll: 0
+
+
+ 
+
+
