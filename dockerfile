@@ -1,15 +1,29 @@
-FROM alpine:latest
 
-RUN apk add openjdk17
+FROM node:14-alpine
+
+WORKDIR /app
+
 
 RUN mkdir -p /opt/ecommerce
 
-RUN wget https://github.com/jkanclerz/computer-programming-4/releases/download/v1.30/my-ecommerce-0.1.jar -O /opt/ecommerce/app.jar
+RUN wget https://github.com/konradkubczyk/pp5/archive/refs/tags/1.0.zip -O /opt/ecommerce/app.zip
+RUN unzip /opt/ecommerce/app.zip -d /app
+RUN sudo dnf install npm 
 
-RUN adduser ecommerce --disabled-password
+COPY package*.json ./
+RUN npm install
 
-USER ecommerce
+COPY . .
+
+
+
 
 EXPOSE 8080
 
-CMD ["/usr/bin/java", "-Dserver.port=8080", "-jar", "/opt/ecommerce/app.jar"]
+
+RUN adduser -D ecommerce
+
+
+USER ecommerce
+
+CMD ["npm", "run", "dev"]
